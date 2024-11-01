@@ -1,27 +1,51 @@
 <script setup>
+import { useTextareaAutosize } from '@vueuse/core'
 import { ref } from 'vue'
 import { Icon } from '@iconify/vue'
 
+/* 彈窗 */
 const isModalShow = ref(false)
 const toggleModal = event => {
   if (event === 'show') {
+    preview.value = [null, null, null]
     isModalShow.value = true
   } else if (event === 'close') {
     isModalShow.value = false
   }
 }
 
+/* 表單資料 */
 const preview = ref([null, null, null])
+const { textarea, input } = useTextareaAutosize()
+
+/* 圖片 */
 const handleFileUpload = (index, event) => {
   const file = event.target.files[0]
   if (file) {
     const reader = new FileReader()
     reader.onload = e => {
+      console.log(index)
       preview.value[index] = e.target.result
     }
     reader.readAsDataURL(file)
   }
 }
+// 刪除圖片資料
+const fileDelete = index => {
+  preview.value[index] = null
+}
+// 圖片預覽
+const visibleRef = ref(false)
+const indexRef = ref(0)
+const imgsRef = ref([])
+const onShow = () => {
+  visibleRef.value = true
+}
+const showSingle = view => {
+  imgsRef.value = view
+  onShow()
+}
+const onHide = () => (visibleRef.value = false)
 </script>
 
 <template>
@@ -57,13 +81,19 @@ const handleFileUpload = (index, event) => {
                     <span class="text-red-500">*</span>
                     <span> 類別 </span>
                   </label>
-                  <input
+                  <select
                     type="text"
                     id="category"
                     name="category"
                     class="border p-2 block w-full"
                     placeholder="請選擇類別"
-                  />
+                  >
+                    <option value="">請選擇類別</option>
+                    <option value="0">操作問題</option>
+                    <option value="1">優化建議</option>
+                    <option value="2">Bug 修復</option>
+                    <option value="3">其他</option>
+                  </select>
                 </div>
 
                 <div class="space-y-2">
@@ -88,13 +118,15 @@ const handleFileUpload = (index, event) => {
                     <span> 描述 </span>
                     <span class="text-gray-400"> 限300字符內 </span>
                   </label>
-                  <input
-                    type="text"
+                  <textarea
+                    ref="textarea"
                     id="description"
                     name="description"
-                    class="border p-2 block w-full"
-                    maxlength="300"
+                    v-model="input"
+                    class="border p-2 w-full block resize-none"
                     placeholder="請描述您的意見/問題"
+                    rows="3"
+                    maxlength="300"
                   />
                 </div>
 
@@ -108,56 +140,63 @@ const handleFileUpload = (index, event) => {
 
                   <div class="flex gap-4">
                     <div v-for="(view, index) in preview" :key="index">
-                      <label
-                        for="upload"
-                        :class="[
-                          view ? 'border-solid' : 'border-dashed',
-                          'flex items-center justify-center   w-32 h-32 rounded-lg border-2 overflow-hidden group cursor-pointer',
-                        ]"
+                      <div
+                        v-if="view"
+                        class="relative border-solid group img-wrapper"
                       >
-                        <div v-if="view" class="relative w-full h-full">
-                          <div
-                            class="absolute top-0 left-0 opacity-0 w-full h-full bg-black/40 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2"
-                          >
-                            <Icon
-                              icon="ic:baseline-zoom-in"
-                              class="text-white text-2xl"
-                            />
-                            <Icon
-                              icon="mdi:delete"
-                              class="text-white text-2xl"
-                            />
-                          </div>
-                          <img
-                            :src="view"
-                            alt="Uploaded Image Preview"
-                            class="w-full h-full object-cover"
-                          />
-                        </div>
-                        <div v-else>
+                        <div
+                          class="absolute top-0 left-0 opacity-0 w-full h-full bg-black/40 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2"
+                        >
                           <Icon
-                            icon="mdi:plus"
-                            class="text-gray-500 text-4xl"
+                            @click="showSingle(view)"
+                            icon="ic:baseline-zoom-in"
+                            class="text-white text-2xl"
+                          />
+                          <Icon
+                            icon="mdi:delete"
+                            class="text-white text-2xl"
+                            @click="fileDelete(index)"
                           />
                         </div>
+                        <img
+                          :src="view"
+                          alt="Uploaded Image Preview"
+                          class="w-full h-full object-cover"
+                        />
+                      </div>
+
+                      <label
+                        v-else
+                        :for="`upload-${index}`"
+                        class="border-dashed img-wrapper"
+                      >
+                        <Icon icon="mdi:plus" class="text-gray-500 text-4xl" />
                       </label>
+
                       <input
                         type="file"
-                        id="upload"
+                        :id="`upload-${index}`"
                         @change="event => handleFileUpload(index, event)"
                         accept="image/*"
                         class="hidden"
                       />
                     </div>
+
+                    <vue-easy-lightbox
+                      :visible="visibleRef"
+                      :imgs="imgsRef"
+                      :index="indexRef"
+                      @hide="onHide"
+                    ></vue-easy-lightbox>
                   </div>
 
-                  <span class="text-gray-400">
+                  <div class="text-gray-400">
                     可提供意見/問題截圖(上傳數量
                     <span class="text-green-400">
                       {{ preview.filter(element => element !== null).length }}
                     </span>
                     /3)
-                  </span>
+                  </div>
                 </div>
 
                 <button
@@ -186,6 +225,17 @@ const handleFileUpload = (index, event) => {
 </template>
 
 <style lang="scss" scoped>
+.img-wrapper {
+  @apply flex items-center justify-center w-32 h-32 rounded-lg border-2 overflow-hidden cursor-pointer;
+}
+textarea {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+textarea::-webkit-scrollbar {
+  display: none;
+}
 .modal-enter-active {
   transition:
     opacity 0.225s ease-in,
